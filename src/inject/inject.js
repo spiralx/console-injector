@@ -1,4 +1,5 @@
-function inject (library) {
+
+function injectFromCdnJs (library) {
   function getURLs () {
     var xmlhttp = new XMLHttpRequest()
 
@@ -34,26 +35,65 @@ function inject (library) {
   getURLs()
 }
 
-async function inject2 (library) {
-  const url = `https://unpkg.com/${library}`
+// ------------------------------------------------------------
 
-  try {
-    const response = await fetch(url)
+function injector (library) {
 
-    const se = document.createElement('script')
-    se.type = 'text/javascript'
-    se.src = url
+  /**
+   * Create a script element to inject JavaScript into a page.
+   *
+   * @param {string} src  URL of script to be injected
+   * @return {Promise<void>}
+   */
+  function injectScript (src) {
+    return new Promise((resolve, reject) => {
+      const se = Object.assign(document.createElement('script'), {
+        onload (event) {
+          // console.info(`Library "${library}" loaded from ${response.url}`)
+          console.info(`onload(src="${src}")`, event)
 
-    document.body.appendChild(se)
+          document.body.removeChild(se)
+          resolve(event)
+        },
+        onerror: reject
+      })
 
-    console.info(`Library "${library}" loaded from ${response.url}`)
-  } catch (ex) {
-    console.warn(`Library "${library}" not found at ${url}`)
+      document.body.appendChild(se)
+      se.src = src
+    })
   }
+
+  // ------------------------------------------------------------
+
+  async function injectFromUnpkg (library) {
+    let url = `https://unpkg.com/${library}`
+
+    try {
+      const response = await fetch(url)
+
+      if (response.url !== url) {
+        url = response.url
+      }
+    } catch (ex) {
+      console.warn(`Library "${library}" not found at ${url}`)
+      return
+    }
+
+    try {
+      await injectScript(url)
+      console.info(`Library "${library}" loaded from "${url}"`)
+    } catch (ex) {
+      console.warn(`Error injecting library "${library}" from "${url}"`, ex)
+    }
+  }
+
+  // ------------------------------------------------------------
+
+  injectFromUnpkg(library)
 }
 
 // ------------------------------------------------------------
 
 const element = document.createElement('script')
-element.innerHTML = 'console.inject = ' + inject2.toString()
+element.innerHTML = 'console.inject = ' + injector.toString()
 document.head.appendChild(element)
